@@ -298,8 +298,11 @@ def check_calibration_status(
             - light_count, dark_count, flat_count, bias_count: int
             - light_metadata: representative light metadata
             - reason: str explaining why incomplete (if applicable)
+            - matched_darks: list of dark file paths that match the lights
+            - matched_flats: list of flat file paths that match the lights
+            - matched_bias: list of bias file paths that match the lights
     """
-    result = {
+    result: Dict[str, Any] = {
         "has_lights": False,
         "has_darks": False,
         "has_flats": False,
@@ -312,6 +315,9 @@ def check_calibration_status(
         "bias_count": 0,
         "light_metadata": None,
         "reason": "",
+        "matched_darks": [],
+        "matched_flats": [],
+        "matched_bias": [],
     }
 
     # Get light frames from the specified directory
@@ -340,6 +346,7 @@ def check_calibration_status(
     matching_darks, exposure_matches = find_matching_darks(light_metadata, darks)
     result["dark_count"] = len(matching_darks)
     result["has_darks"] = len(matching_darks) > 0
+    result["matched_darks"] = matching_darks
 
     # Determine if bias is needed
     result["needs_bias"] = not exposure_matches
@@ -352,12 +359,14 @@ def check_calibration_status(
     matching_flats = find_matching_flats(light_metadata, flats)
     result["flat_count"] = len(matching_flats)
     result["has_flats"] = len(matching_flats) > 0
+    result["matched_flats"] = matching_flats
 
     # Check bias if needed
     if result["needs_bias"]:
         matching_bias = find_matching_bias(light_metadata, bias)
         result["bias_count"] = len(matching_bias)
         result["has_bias"] = len(matching_bias) > 0
+        result["matched_bias"] = matching_bias
         logger.debug(
             f"Bias needed: found={len(matching_bias)}, has_bias={result['has_bias']}"
         )

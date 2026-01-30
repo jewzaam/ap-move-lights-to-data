@@ -125,11 +125,62 @@ def move_directory(
 
         # Move the directory
         shutil.move(str(source_path), str(dest_path))
-        logger.info(f"Successfully moved: {source_path} -> {dest_path}")
+        logger.debug(f"Successfully moved: {source_path} -> {dest_path}")
         return True
     except Exception as e:
         logger.error(f"Error moving directory from {source_path} to {dest_path}: {e}")
         return False
+
+
+def move_calibration_files(
+    calibration_files: List[str],
+    source_dir: str,
+    dest_dir: str,
+    debug: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """
+    Move calibration files while preserving directory structure.
+
+    Args:
+        calibration_files: List of calibration file paths to move
+        source_dir: Source root directory
+        dest_dir: Destination root directory
+        debug: Enable debug output
+        dry_run: If True, only print what would be done
+
+    Returns:
+        Number of files successfully moved
+    """
+    source_path = Path(ap_common.replace_env_vars(source_dir))
+    dest_path = Path(ap_common.replace_env_vars(dest_dir))
+    moved_count = 0
+
+    for cal_file in calibration_files:
+        cal_path = Path(cal_file)
+
+        try:
+            # Calculate relative path from source directory
+            relative_path = cal_path.relative_to(source_path)
+        except ValueError:
+            # File is not under source_dir, skip it
+            logger.warning(
+                f"Calibration file {cal_file} is not under source directory {source_path}, skipping"
+            )
+            continue
+
+        # Calculate destination path
+        dest_file = dest_path / relative_path
+
+        # Move the file using ap-common's move_file
+        try:
+            ap_common.move_file(str(cal_path), str(dest_file), debug, dry_run)
+            moved_count += 1
+            logger.debug(f"Moved calibration file: {cal_file} -> {dest_file}")
+        except Exception as e:
+            logger.error(f"Failed to move calibration file {cal_file}: {e}")
+
+    return moved_count
 
 
 def process_light_directories(
@@ -234,7 +285,22 @@ def process_light_directories(
             + (f", {status['bias_count']} bias" if status["needs_bias"] else "")
         )
 
-        # Move the directory
+        # Move calibration files first (so they're in place before lights)
+        total_cal_moved = 0
+        total_cal_moved += move_calibration_files(
+            status["matched_darks"], source_dir, dest_dir, debug, dry_run
+        )
+        total_cal_moved += move_calibration_files(
+            status["matched_flats"], source_dir, dest_dir, debug, dry_run
+        )
+        if status["needs_bias"]:
+            total_cal_moved += move_calibration_files(
+                status["matched_bias"], source_dir, dest_dir, debug, dry_run
+            )
+
+        logger.debug(f"Moved {total_cal_moved} calibration files")
+
+        # Move the lights directory
         dest_full = dest_path / relative_path
         success = move_directory(image_dir, str(dest_full), debug, dry_run)
 
@@ -247,7 +313,7 @@ def process_light_directories(
 
     # Cleanup empty directories in source
     if not dry_run and results["moved"] > 0:
-        logger.info(f"Cleaning up empty directories in {source_path}")
+        logger.debug(f"Cleaning up empty directories in {source_path}")
         ap_common.delete_empty_directories(str(source_path), dryrun=dry_run)
 
     logger.debug(
