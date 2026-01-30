@@ -148,6 +148,9 @@ class TestProcessLightDirectories:
             "bias_count": 0,
             "light_metadata": {},
             "reason": "No matching dark frames",
+            "matched_darks": [],
+            "matched_flats": [],
+            "matched_bias": [],
         }
 
         results = move_lights_to_data.process_light_directories(
@@ -176,6 +179,9 @@ class TestProcessLightDirectories:
             "bias_count": 0,
             "light_metadata": {},
             "reason": "No matching flat frames",
+            "matched_darks": [],
+            "matched_flats": [],
+            "matched_bias": [],
         }
 
         results = move_lights_to_data.process_light_directories(
@@ -204,6 +210,9 @@ class TestProcessLightDirectories:
             "bias_count": 0,
             "light_metadata": {},
             "reason": "Dark exposure mismatch requires bias, but none found",
+            "matched_darks": [],
+            "matched_flats": [],
+            "matched_bias": [],
         }
 
         results = move_lights_to_data.process_light_directories(
@@ -215,11 +224,18 @@ class TestProcessLightDirectories:
         assert results["moved"] == 0
 
     @patch("ap_move_lights_to_data.move_lights_to_data.ap_common")
+    @patch("ap_move_lights_to_data.move_lights_to_data.move_calibration_files")
     @patch("ap_move_lights_to_data.move_lights_to_data.move_directory")
     @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
     @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
     def test_moves_when_calibration_complete(
-        self, mock_find, mock_status, mock_move, mock_ap_common, tmp_path
+        self,
+        mock_find,
+        mock_status,
+        mock_move,
+        mock_move_cal,
+        mock_ap_common,
+        tmp_path,
     ):
         """Verify directories are moved when calibration is complete."""
         source_dir = tmp_path / "10_Blink"
@@ -239,9 +255,13 @@ class TestProcessLightDirectories:
             "flat_count": 5,
             "bias_count": 0,
             "light_metadata": {},
-            "reason": None,
+            "reason": "",
+            "matched_darks": [],
+            "matched_flats": [],
+            "matched_bias": [],
         }
         mock_move.return_value = True
+        mock_move_cal.return_value = 0
         mock_ap_common.replace_env_vars.side_effect = lambda x: x
 
         results = move_lights_to_data.process_light_directories(
@@ -270,6 +290,9 @@ class TestProcessLightDirectories:
             "bias_count": 0,
             "light_metadata": None,
             "reason": "No light frames found",
+            "matched_darks": [],
+            "matched_flats": [],
+            "matched_bias": [],
         }
 
         results = move_lights_to_data.process_light_directories(
