@@ -1,0 +1,56 @@
+"""Tests for config module."""
+
+from ap_move_lights_to_data import config
+
+
+def test_keyword_constants_exist():
+    """Verify all keyword constants are defined."""
+    assert config.KEYWORD_TYPE == "type"
+    assert config.KEYWORD_CAMERA == "camera"
+    assert config.KEYWORD_SETTEMP == "settemp"
+    assert config.KEYWORD_GAIN == "gain"
+    assert config.KEYWORD_OFFSET == "offset"
+    assert config.KEYWORD_READOUTMODE == "readoutmode"
+    assert config.KEYWORD_EXPOSURESECONDS == "exposureseconds"
+    assert config.KEYWORD_DATE == "date"
+    assert config.KEYWORD_FILTER == "filter"
+
+
+def test_type_constants():
+    """Verify frame type constants."""
+    assert config.TYPE_LIGHT == "light"
+    assert config.TYPE_DARK == "dark"
+    assert config.TYPE_FLAT == "flat"
+    assert config.TYPE_BIAS == "bias"
+
+
+def test_dark_match_keywords():
+    """Verify dark matching keywords include required fields."""
+    required = [
+        config.KEYWORD_CAMERA,
+        config.KEYWORD_SETTEMP,
+        config.KEYWORD_GAIN,
+        config.KEYWORD_OFFSET,
+        config.KEYWORD_READOUTMODE,
+    ]
+    for kw in required:
+        assert kw in config.DARK_MATCH_KEYWORDS
+
+
+def test_flat_match_keywords():
+    """Verify flat matching keywords include filter."""
+    assert config.KEYWORD_FILTER in config.FLAT_MATCH_KEYWORDS
+    # Flats should also match on camera settings
+    assert config.KEYWORD_CAMERA in config.FLAT_MATCH_KEYWORDS
+
+
+def test_default_directories():
+    """Verify default directory names."""
+    assert config.DEFAULT_BLINK_DIR == "10_Blink"
+    assert config.DEFAULT_DATA_DIR == "20_Data"
+
+
+def test_supported_extensions():
+    """Verify supported file extensions."""
+    assert "*.fits" in config.SUPPORTED_EXTENSIONS
+    assert "*.xisf" in config.SUPPORTED_EXTENSIONS
