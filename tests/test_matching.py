@@ -335,7 +335,7 @@ class TestCheckCalibrationStatus:
         result = matching.check_calibration_status("/test/dir", "/source")
 
         assert result["is_complete"] is False
-        assert result["reason"] == "No matching dark frames"
+        assert result["reason"] == "Missing darks, bias"
 
     @patch("ap_move_lights_to_data.matching.get_frames_by_type")
     def test_incomplete_when_no_flats(self, mock_get_frames):
@@ -362,7 +362,7 @@ class TestCheckCalibrationStatus:
         result = matching.check_calibration_status("/test/dir", "/source")
 
         assert result["is_complete"] is False
-        assert result["reason"] == "No matching flat frames"
+        assert result["reason"] == "Missing flats"
 
     @patch("ap_move_lights_to_data.matching.get_frames_by_type")
     def test_needs_bias_when_exposure_mismatch(self, mock_get_frames):

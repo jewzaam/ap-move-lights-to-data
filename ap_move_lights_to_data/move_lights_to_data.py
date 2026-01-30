@@ -47,7 +47,7 @@ def find_light_directories(
         recursive=True,
         required_properties=[config.KEYWORD_TYPE],
         filters={config.KEYWORD_TYPE: config.TYPE_LIGHT},
-        profileFromPath=False,
+        profileFromPath=True,
         debug=debug,
         printStatus=debug,
     )
@@ -61,7 +61,7 @@ def find_light_directories(
             logger.debug(f"Found light frame in: {directory}")
 
     result = sorted(light_dirs)
-    logger.info(f"Found {len(result)} directories with light frames")
+    logger.debug(f"Found {len(result)} directories with light frames")
 
     return result
 
@@ -114,9 +114,6 @@ def move_directory(
     dest_path = Path(dest)
 
     logger.debug(f"Moving: {source_path} -> {dest_path}")
-    if debug or dry_run:
-        print(f"  Moving: {source_path}")
-        print(f"      To: {dest_path}")
 
     if dry_run:
         return True
@@ -169,20 +166,20 @@ def process_light_directories(
     source_path = Path(ap_common.replace_env_vars(source_dir))
     dest_path = Path(ap_common.replace_env_vars(dest_dir))
 
-    logger.info(f"Processing light directories from {source_path} to {dest_path}")
+    logger.debug(f"Processing light directories from {source_path} to {dest_path}")
 
     # Find all directories with image files
     image_dirs = find_light_directories(source_dir, debug)
 
     if not image_dirs:
-        logger.warning(f"No image directories found in {source_path}")
+        logger.warning(f"No light frame directories found in {source_path}")
         return results
 
-    logger.info(f"Found {len(image_dirs)} directories to check")
+    logger.debug(f"Found {len(image_dirs)} directories to check")
 
     for image_dir in image_dirs:
         relative_path = get_target_from_path(image_dir, source_dir)
-        logger.info(f"Processing: {relative_path}")
+        logger.debug(f"Processing: {relative_path}")
 
         # Check calibration status
         status = check_calibration_status(image_dir, source_dir, debug)
@@ -209,10 +206,20 @@ def process_light_directories(
                 print("  Note: Bias required (dark exposure != light exposure)")
 
         if not status["is_complete"]:
-            reason = status["reason"]
-            logger.info(f"Skipping {relative_path}: {reason}")
+            # Build detailed message about missing calibration
+            missing = []
+            if not status["has_darks"]:
+                missing.append("darks")
+            if not status["has_flats"]:
+                missing.append("flats")
+            if status["needs_bias"] and not status["has_bias"]:
+                missing.append("bias")
 
-            # Track specific skip reason (check bias first since reason may contain multiple keywords)
+            missing_str = ", ".join(missing)
+            logger.warning(f"Skipping {relative_path}: missing {missing_str}")
+
+            # Track specific skip reason
+            reason = status["reason"]
             if "bias" in reason.lower():
                 results["skipped_no_bias"] += 1
             elif "flat" in reason.lower():
@@ -221,7 +228,7 @@ def process_light_directories(
                 results["skipped_no_darks"] += 1
             continue
 
-        print(
+        logger.debug(
             f"  Calibration complete: {status['dark_count']} darks, "
             f"{status['flat_count']} flats"
             + (f", {status['bias_count']} bias" if status["needs_bias"] else "")
@@ -233,7 +240,7 @@ def process_light_directories(
 
         if success:
             results["moved"] += 1
-            logger.info(f"Moved {relative_path} to {dest_full}")
+            logger.debug(f"Moved {relative_path} to {dest_full}")
         else:
             results["errors"] += 1
             logger.error(f"Failed to move {relative_path}")
@@ -241,9 +248,9 @@ def process_light_directories(
     # Cleanup empty directories in source
     if not dry_run and results["moved"] > 0:
         logger.info(f"Cleaning up empty directories in {source_path}")
-        ap_common.delete_empty_directories(str(source_path), debug=debug)
+        ap_common.delete_empty_directories(str(source_path), dryrun=dry_run)
 
-    logger.info(
+    logger.debug(
         f"Processing complete: moved={results['moved']}, "
         f"skipped={results['skipped_no_lights'] + results['skipped_no_darks'] + results['skipped_no_flats'] + results['skipped_no_bias']}, "
         f"errors={results['errors']}"
@@ -290,7 +297,6 @@ def main():
 
     print(f"Source directory: {args.source_dir}")
     print(f"Destination directory: {args.dest_dir}")
-    print("Calibration frames searched in lights directory and parent directories")
 
     if args.dry_run:
         print("\n*** DRY RUN - No files will be moved ***\n")

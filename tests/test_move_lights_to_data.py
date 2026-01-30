@@ -18,8 +18,8 @@ class TestFindLightDirectories:
         """Verify directories containing LIGHT frames are found."""
         light_dir = str(tmp_path / "10_Blink" / "M31" / "DATE_2024-01-15")
         mock_metadata.return_value = {
-            os.path.join(light_dir, "light_001.fits"): {"type": "light"},
-            os.path.join(light_dir, "light_002.fits"): {"type": "light"},
+            os.path.join(light_dir, "light_001.fits"): {"type": "LIGHT"},
+            os.path.join(light_dir, "light_002.fits"): {"type": "LIGHT"},
         }
 
         result = move_lights_to_data.find_light_directories(str(tmp_path / "10_Blink"))
@@ -33,8 +33,8 @@ class TestFindLightDirectories:
         dir1 = str(tmp_path / "10_Blink" / "M31")
         dir2 = str(tmp_path / "10_Blink" / "NGC7000")
         mock_metadata.return_value = {
-            os.path.join(dir1, "light_001.fits"): {"type": "light"},
-            os.path.join(dir2, "light_001.xisf"): {"type": "light"},
+            os.path.join(dir1, "light_001.fits"): {"type": "LIGHT"},
+            os.path.join(dir2, "light_001.xisf"): {"type": "LIGHT"},
         }
 
         result = move_lights_to_data.find_light_directories(str(tmp_path / "10_Blink"))

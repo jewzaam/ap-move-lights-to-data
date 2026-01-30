@@ -21,11 +21,11 @@ def test_keyword_constants_exist():
 
 
 def test_type_constants():
-    """Verify frame type constants."""
-    assert config.TYPE_LIGHT == "light"
-    assert config.TYPE_DARK == "dark"
-    assert config.TYPE_FLAT == "flat"
-    assert config.TYPE_BIAS == "bias"
+    """Verify frame type constants match FITS header values."""
+    assert config.TYPE_LIGHT == "LIGHT"
+    assert config.TYPE_DARK == "DARK"
+    assert config.TYPE_FLAT == "FLAT"
+    assert config.TYPE_BIAS == "BIAS"
 
 
 def test_dark_match_keywords():
@@ -55,6 +55,7 @@ def test_default_directories():
 
 
 def test_supported_extensions():
-    """Verify supported file extensions."""
-    assert "*.fits" in config.SUPPORTED_EXTENSIONS
-    assert "*.xisf" in config.SUPPORTED_EXTENSIONS
+    """Verify supported file extensions (regex patterns)."""
+    assert r"\.fits$" in config.SUPPORTED_EXTENSIONS
+    assert r"\.fit$" in config.SUPPORTED_EXTENSIONS
+    assert r"\.xisf$" in config.SUPPORTED_EXTENSIONS

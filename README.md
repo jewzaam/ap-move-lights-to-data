@@ -3,13 +3,13 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
-Move light frames from blink directory to data directory when calibration frames (darks, flats, and bias if needed) are available in the same directory.
+Move light frames from blink directory to data directory when calibration frames (darks, flats, and bias if needed) are available.
 
 ## Overview
 
-This tool automates the workflow step between blinking/reviewing light frames and processing them. It only moves light frames to the data directory when matching calibration frames exist **in the same directory**, ensuring you don't start processing data that can't be properly calibrated.
+This tool automates the workflow step between blinking/reviewing light frames and processing them. It only moves light frames to the data directory when matching calibration frames exist, ensuring you don't start processing data that can't be properly calibrated.
 
-**Key requirement**: Calibration frames (darks, flats, bias) must be co-located with the light frames in the same directory structure.
+Calibration frames are searched for in the lights directory first, then in parent directories up to the source directory boundary. This supports flexible workflows where filter-specific flats are stored with lights while shared darks are in parent directories.
 
 ## Installation
 
@@ -58,7 +58,7 @@ python -m ap_move_lights_to_data \
 
 ## Calibration Requirements
 
-Lights are only moved when calibration frames are found **in the same directory** matching these criteria:
+Lights are only moved when calibration frames are found (in the lights directory or parent directories) matching these criteria:
 
 ### Dark Matching
 - Camera
@@ -84,35 +84,60 @@ If dark exposure differs from light exposure: **Bias required**
 
 ## Directory Structure
 
-The tool expects calibration frames to be in the same directory as lights:
+The tool searches for calibration frames in the lights directory and parent directories up to the source directory. Both co-located and parent directory configurations are supported.
+
+### Example 1: Co-located (all frames together)
 
 ```
 10_Blink/
   M31/
-    accept/
-      DATE_2024-01-15/
-        light_001.fits      # Light frames
-        light_002.fits
-        dark_001.fits       # Dark frames (same dir)
-        dark_002.fits
-        flat_Ha_001.fits    # Flat frames (same dir)
-        flat_Ha_002.fits
-        bias_001.fits       # Bias (only if dark exp != light exp)
-
-# Becomes (if calibration complete):
-
-20_Data/
-  M31/
-    accept/
-      DATE_2024-01-15/
-        light_001.fits
-        light_002.fits
-        dark_001.fits
-        dark_002.fits
-        flat_Ha_001.fits
-        flat_Ha_002.fits
-        bias_001.fits
+    DATE_2024-01-15/
+      light_001.fits      # Light frames
+      light_002.fits
+      dark_001.fits       # Dark frames (same dir)
+      flat_Ha_001.fits    # Flat frames (same dir)
+      bias_001.fits       # Bias (if needed)
 ```
+
+### Example 2: Parent directory (shared calibration)
+
+```
+10_Blink/
+  M31/
+    DATE_2024-01-15/
+      dark_001.fits          # Shared darks in date directory
+      dark_002.fits
+      FILTER_Ha/
+        light_001.fits       # Light frames
+        light_002.fits
+        flat_Ha_001.fits     # Filter-specific flats with lights
+        flat_Ha_002.fits
+```
+
+### Example 3: Mixed (flats with lights, darks in parent)
+
+```
+10_Blink/
+  M31/
+    DATE_2024-01-15/
+      master_dark_300s.fits  # Shared master dark in parent
+      FILTER_Ha/
+        light_001.fits       # Lights
+        flat_Ha_001.fits     # Flats with lights
+      FILTER_OIII/
+        light_001.fits       # Lights
+        flat_OIII_001.fits   # Flats with lights
+        # Both filters use same master_dark_300s.fits from parent
+```
+
+The tool searches from the lights directory upward, stopping before reaching the source directory (`10_Blink` in these examples).
+
+### Frame Type Support
+
+The tool recognizes both regular and MASTER frame types:
+- `dark`, `DARK`, `master dark`, `MASTER DARK`
+- `flat`, `FLAT`, `master flat`, `MASTER FLAT`
+- `bias`, `BIAS`, `master bias`, `MASTER BIAS`
 
 ## Dependencies
 

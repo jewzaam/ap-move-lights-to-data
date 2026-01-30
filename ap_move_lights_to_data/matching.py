@@ -40,7 +40,7 @@ def get_frames_by_type(
         patterns=config.SUPPORTED_EXTENSIONS,
         recursive=False,  # explicitly set to False
         required_properties=[config.KEYWORD_TYPE],
-        profileFromPath=False,
+        profileFromPath=True,
         printStatus=debug,
     )
 
@@ -53,13 +53,13 @@ def get_frames_by_type(
     for filepath, metadata in all_metadata.items():
         frame_type = str(metadata.get(config.KEYWORD_TYPE, "")).lower()
 
-        if config.TYPE_LIGHT in frame_type:
+        if config.TYPE_LIGHT.lower() in frame_type:
             lights[filepath] = metadata
-        elif config.TYPE_DARK in frame_type:
+        elif config.TYPE_DARK.lower() in frame_type:
             darks[filepath] = metadata
-        elif config.TYPE_FLAT in frame_type:
+        elif config.TYPE_FLAT.lower() in frame_type:
             flats[filepath] = metadata
-        elif config.TYPE_BIAS in frame_type:
+        elif config.TYPE_BIAS.lower() in frame_type:
             bias[filepath] = metadata
 
     logger.debug(f"Found {len(lights)} light frames")
@@ -160,6 +160,7 @@ def find_matching_darks(
     matching = []
     exposure_matches = False
     light_exposure = light_metadata.get(config.KEYWORD_EXPOSURESECONDS)
+    logger.debug(f"Matching darks for light with exposure={light_exposure}s")
 
     for filepath, dark_meta in dark_frames.items():
         # Check all match keywords
@@ -180,6 +181,15 @@ def find_matching_darks(
                 try:
                     if float(light_exposure) == float(dark_exposure):
                         exposure_matches = True
+                        logger.debug(
+                            f"Exposure match: light={light_exposure}s, dark={dark_exposure}s "
+                            f"(file: {filepath})"
+                        )
+                    else:
+                        logger.debug(
+                            f"Exposure mismatch: light={light_exposure}s, dark={dark_exposure}s "
+                            f"(file: {filepath})"
+                        )
                 except (ValueError, TypeError):
                     pass
 
@@ -301,7 +311,7 @@ def check_calibration_status(
         "flat_count": 0,
         "bias_count": 0,
         "light_metadata": None,
-        "reason": None,
+        "reason": "",
     }
 
     # Get light frames from the specified directory
@@ -331,32 +341,46 @@ def check_calibration_status(
     result["dark_count"] = len(matching_darks)
     result["has_darks"] = len(matching_darks) > 0
 
-    if not matching_darks:
-        result["reason"] = "No matching dark frames"
-        return result
-
     # Determine if bias is needed
     result["needs_bias"] = not exposure_matches
+    logger.debug(
+        f"Dark matching: found={len(matching_darks)}, exposure_matches={exposure_matches}, "
+        f"needs_bias={result['needs_bias']}"
+    )
 
     # Find matching flats
     matching_flats = find_matching_flats(light_metadata, flats)
     result["flat_count"] = len(matching_flats)
     result["has_flats"] = len(matching_flats) > 0
 
-    if not matching_flats:
-        result["reason"] = "No matching flat frames"
-        return result
-
     # Check bias if needed
     if result["needs_bias"]:
         matching_bias = find_matching_bias(light_metadata, bias)
         result["bias_count"] = len(matching_bias)
         result["has_bias"] = len(matching_bias) > 0
+        logger.debug(
+            f"Bias needed: found={len(matching_bias)}, has_bias={result['has_bias']}"
+        )
 
-        if not matching_bias:
-            result["reason"] = "Dark exposure mismatch requires bias, but none found"
-            return result
+    # Determine completeness and build reason message
+    missing = []
+    if not result["has_darks"]:
+        missing.append("darks")
+    if not result["has_flats"]:
+        missing.append("flats")
+    if result["needs_bias"] and not result["has_bias"]:
+        missing.append("bias")
 
-    # All checks passed
-    result["is_complete"] = True
+    logger.debug(
+        f"Completeness check: has_darks={result['has_darks']}, has_flats={result['has_flats']}, "
+        f"needs_bias={result['needs_bias']}, has_bias={result.get('has_bias', 'N/A')}, "
+        f"missing={missing}"
+    )
+
+    if missing:
+        result["is_complete"] = False
+        result["reason"] = f"Missing {', '.join(missing)}"
+    else:
+        result["is_complete"] = True
+
     return result

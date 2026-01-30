@@ -1,10 +1,10 @@
-.PHONY: install install-dev install-deps uninstall clean format lint test test-verbose test-coverage coverage default
+.PHONY: install install-dev install-deps uninstall clean format lint typecheck test test-verbose test-coverage coverage default
 
 # Detect Python command (works on Windows and Unix)
 PYTHON := python
 
 # Default target: run all checks
-default: format lint test coverage
+default: format lint typecheck test coverage
 
 # Installation targets
 install:
@@ -35,6 +35,10 @@ format: install-dev
 # Lint code with flake8 (disable multiprocessing to avoid sandbox issues, match black line length)
 lint: install-dev
 	$(PYTHON) -m flake8 --jobs=1 --max-line-length=88 --extend-ignore=E203,E266,E501,W503,F401,W605,E722 ap_move_lights_to_data tests
+
+# Type check with mypy
+typecheck: install-dev
+	$(PYTHON) -m mypy ap_move_lights_to_data
 
 # Testing (install deps first, then run tests)
 test: install-dev

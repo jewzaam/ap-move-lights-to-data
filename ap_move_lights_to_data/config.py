@@ -17,11 +17,11 @@ KEYWORD_EXPOSURESECONDS = "exposureseconds"
 KEYWORD_DATE = "date"
 KEYWORD_FILTER = "filter"
 
-# Frame types
-TYPE_LIGHT = "light"
-TYPE_DARK = "dark"
-TYPE_FLAT = "flat"
-TYPE_BIAS = "bias"
+# Frame types (match actual FITS header values)
+TYPE_LIGHT = "LIGHT"
+TYPE_DARK = "DARK"
+TYPE_FLAT = "FLAT"
+TYPE_BIAS = "BIAS"
 
 # Required keywords for matching lights to calibration frames
 LIGHT_REQUIRED_KEYWORDS = [
@@ -58,10 +58,10 @@ FLAT_MATCH_KEYWORDS = [
 DEFAULT_BLINK_DIR = "10_Blink"
 DEFAULT_DATA_DIR = "20_Data"
 
-# Supported file extensions (glob patterns for file matching)
-SUPPORTED_EXTENSIONS = ["*.fits", "*.fit", "*.xisf"]
+# Supported file extensions (regex patterns for file matching)
+SUPPORTED_EXTENSIONS = [r"\.fits$", r"\.fit$", r"\.xisf$"]
 
-# Supported file extensions (for direct extension checks without glob)
+# Supported file extensions (for direct extension checks without regex)
 SUPPORTED_EXTENSIONS_RAW = ["fits", "fit", "xisf"]
 
 # Logging configuration
