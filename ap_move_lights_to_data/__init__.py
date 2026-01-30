@@ -23,10 +23,11 @@ from .config import (
 )
 
 from .matching import (
+    get_frames_by_type,
     find_matching_darks,
     find_matching_flats,
-    has_calibration_frames,
-    get_light_group_metadata,
+    find_matching_bias,
+    check_calibration_status,
 )
 
 from .move_lights_to_data import (
@@ -59,10 +60,11 @@ __all__ = [
     "DEFAULT_DATA_DIR",
     "SUPPORTED_EXTENSIONS",
     # Matching functions
+    "get_frames_by_type",
     "find_matching_darks",
     "find_matching_flats",
-    "has_calibration_frames",
-    "get_light_group_metadata",
+    "find_matching_bias",
+    "check_calibration_status",
     # Main functions
     "find_light_directories",
     "get_target_from_path",

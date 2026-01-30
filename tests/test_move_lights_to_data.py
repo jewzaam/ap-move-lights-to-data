@@ -1,10 +1,8 @@
 """Tests for move_lights_to_data module."""
 
 import os
-import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -130,70 +128,152 @@ class TestMoveDirectory:
 class TestProcessLightDirectories:
     """Tests for process_light_directories function."""
 
-    @patch("ap_move_lights_to_data.move_lights_to_data.has_calibration_frames")
-    @patch("ap_move_lights_to_data.move_lights_to_data.get_light_group_metadata")
+    @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
     @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
-    def test_skips_when_no_darks(
-        self, mock_find, mock_metadata, mock_calibration, tmp_path
-    ):
+    def test_skips_when_no_darks(self, mock_find, mock_status, tmp_path):
         """Verify directories are skipped when no darks exist."""
         mock_find.return_value = [str(tmp_path / "light_dir")]
-        mock_metadata.return_value = {"type": "light"}
-        mock_calibration.return_value = (False, True, 0, 5)  # No darks, has flats
+        mock_status.return_value = {
+            "has_lights": True,
+            "has_darks": False,
+            "has_flats": True,
+            "has_bias": False,
+            "needs_bias": False,
+            "is_complete": False,
+            "light_count": 10,
+            "dark_count": 0,
+            "flat_count": 5,
+            "bias_count": 0,
+            "light_metadata": {},
+            "reason": "No matching dark frames",
+        }
 
         results = move_lights_to_data.process_light_directories(
             str(tmp_path / "10_Blink"),
             str(tmp_path / "20_Data"),
-            [str(tmp_path / "calibration")],
         )
 
         assert results["skipped_no_darks"] == 1
         assert results["moved"] == 0
 
-    @patch("ap_move_lights_to_data.move_lights_to_data.has_calibration_frames")
-    @patch("ap_move_lights_to_data.move_lights_to_data.get_light_group_metadata")
+    @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
     @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
-    def test_skips_when_no_flats(
-        self, mock_find, mock_metadata, mock_calibration, tmp_path
-    ):
+    def test_skips_when_no_flats(self, mock_find, mock_status, tmp_path):
         """Verify directories are skipped when no flats exist."""
         mock_find.return_value = [str(tmp_path / "light_dir")]
-        mock_metadata.return_value = {"type": "light"}
-        mock_calibration.return_value = (True, False, 10, 0)  # Has darks, no flats
+        mock_status.return_value = {
+            "has_lights": True,
+            "has_darks": True,
+            "has_flats": False,
+            "has_bias": False,
+            "needs_bias": False,
+            "is_complete": False,
+            "light_count": 10,
+            "dark_count": 5,
+            "flat_count": 0,
+            "bias_count": 0,
+            "light_metadata": {},
+            "reason": "No matching flat frames",
+        }
 
         results = move_lights_to_data.process_light_directories(
             str(tmp_path / "10_Blink"),
             str(tmp_path / "20_Data"),
-            [str(tmp_path / "calibration")],
         )
 
         assert results["skipped_no_flats"] == 1
         assert results["moved"] == 0
 
+    @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
+    @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
+    def test_skips_when_no_bias_needed(self, mock_find, mock_status, tmp_path):
+        """Verify directories are skipped when bias needed but missing."""
+        mock_find.return_value = [str(tmp_path / "light_dir")]
+        mock_status.return_value = {
+            "has_lights": True,
+            "has_darks": True,
+            "has_flats": True,
+            "has_bias": False,
+            "needs_bias": True,
+            "is_complete": False,
+            "light_count": 10,
+            "dark_count": 5,
+            "flat_count": 5,
+            "bias_count": 0,
+            "light_metadata": {},
+            "reason": "Dark exposure mismatch requires bias, but none found",
+        }
+
+        results = move_lights_to_data.process_light_directories(
+            str(tmp_path / "10_Blink"),
+            str(tmp_path / "20_Data"),
+        )
+
+        assert results["skipped_no_bias"] == 1
+        assert results["moved"] == 0
+
     @patch("ap_move_lights_to_data.move_lights_to_data.ap_common")
     @patch("ap_move_lights_to_data.move_lights_to_data.move_directory")
-    @patch("ap_move_lights_to_data.move_lights_to_data.has_calibration_frames")
-    @patch("ap_move_lights_to_data.move_lights_to_data.get_light_group_metadata")
+    @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
     @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
-    def test_moves_when_calibration_exists(
-        self, mock_find, mock_metadata, mock_calibration, mock_move, mock_ap_common, tmp_path
+    def test_moves_when_calibration_complete(
+        self, mock_find, mock_status, mock_move, mock_ap_common, tmp_path
     ):
-        """Verify directories are moved when calibration frames exist."""
+        """Verify directories are moved when calibration is complete."""
         source_dir = tmp_path / "10_Blink"
         light_dir = source_dir / "M31" / "DATE_2024"
         light_dir.mkdir(parents=True)
 
         mock_find.return_value = [str(light_dir)]
-        mock_metadata.return_value = {"type": "light"}
-        mock_calibration.return_value = (True, True, 10, 5)  # Has both
+        mock_status.return_value = {
+            "has_lights": True,
+            "has_darks": True,
+            "has_flats": True,
+            "has_bias": False,
+            "needs_bias": False,
+            "is_complete": True,
+            "light_count": 10,
+            "dark_count": 5,
+            "flat_count": 5,
+            "bias_count": 0,
+            "light_metadata": {},
+            "reason": None,
+        }
         mock_move.return_value = True
         mock_ap_common.replace_env_vars.side_effect = lambda x: x
 
         results = move_lights_to_data.process_light_directories(
             str(source_dir),
             str(tmp_path / "20_Data"),
-            [str(tmp_path / "calibration")],
         )
 
         assert results["moved"] == 1
         mock_move.assert_called_once()
+
+    @patch("ap_move_lights_to_data.move_lights_to_data.check_calibration_status")
+    @patch("ap_move_lights_to_data.move_lights_to_data.find_light_directories")
+    def test_skips_when_no_lights(self, mock_find, mock_status, tmp_path):
+        """Verify directories are skipped when no light frames found."""
+        mock_find.return_value = [str(tmp_path / "some_dir")]
+        mock_status.return_value = {
+            "has_lights": False,
+            "has_darks": False,
+            "has_flats": False,
+            "has_bias": False,
+            "needs_bias": False,
+            "is_complete": False,
+            "light_count": 0,
+            "dark_count": 0,
+            "flat_count": 0,
+            "bias_count": 0,
+            "light_metadata": None,
+            "reason": "No light frames found",
+        }
+
+        results = move_lights_to_data.process_light_directories(
+            str(tmp_path / "10_Blink"),
+            str(tmp_path / "20_Data"),
+        )
+
+        assert results["skipped_no_lights"] == 1
+        assert results["moved"] == 0

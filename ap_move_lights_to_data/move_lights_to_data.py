@@ -4,12 +4,12 @@ import argparse
 import os
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import ap_common
 
 from . import config
-from .matching import get_light_group_metadata, has_calibration_frames
+from .matching import check_calibration_status
 
 
 def find_light_directories(
@@ -119,78 +119,85 @@ def move_directory(
 def process_light_directories(
     source_dir: str,
     dest_dir: str,
-    calibration_dirs: List[str],
     debug: bool = False,
     dry_run: bool = False,
 ) -> dict:
     """
     Process light directories and move those with calibration frames.
 
+    Calibration frames (darks, flats, and bias if needed) must be in the
+    same directory as the light frames.
+
     Args:
         source_dir: Source directory containing lights (e.g., 10_Blink)
         dest_dir: Destination directory (e.g., 20_Data)
-        calibration_dirs: List of directories containing calibration frames
         debug: Enable debug output
         dry_run: If True, only print what would be done
 
     Returns:
-        Dict with counts: moved, skipped_no_darks, skipped_no_flats, errors
+        Dict with counts: moved, skipped (by reason), errors
     """
     results = {
         "moved": 0,
+        "skipped_no_lights": 0,
         "skipped_no_darks": 0,
         "skipped_no_flats": 0,
-        "skipped_no_metadata": 0,
+        "skipped_no_bias": 0,
         "errors": 0,
     }
 
     source_path = Path(ap_common.replace_env_vars(source_dir))
     dest_path = Path(ap_common.replace_env_vars(dest_dir))
 
-    # Find all light directories
-    light_dirs = find_light_directories(source_dir, debug)
+    # Find all directories with image files
+    image_dirs = find_light_directories(source_dir, debug)
 
-    if not light_dirs:
-        print(f"No light directories found in {source_path}")
+    if not image_dirs:
+        print(f"No image directories found in {source_path}")
         return results
 
-    print(f"Found {len(light_dirs)} light directories to process")
+    print(f"Found {len(image_dirs)} directories to check")
 
-    for light_dir in light_dirs:
-        relative_path = get_target_from_path(light_dir, source_dir)
+    for image_dir in image_dirs:
+        relative_path = get_target_from_path(image_dir, source_dir)
         print(f"\nProcessing: {relative_path}")
 
-        # Get representative metadata for this light group
-        metadata = get_light_group_metadata(light_dir, debug)
+        # Check calibration status (frames must be in same directory)
+        status = check_calibration_status(image_dir, debug)
 
-        if not metadata:
-            print("  SKIP: No metadata found")
-            results["skipped_no_metadata"] += 1
+        if not status["has_lights"]:
+            print("  SKIP: No light frames found")
+            results["skipped_no_lights"] += 1
             continue
 
         if debug:
-            print(f"  Metadata: {metadata}")
+            print(f"  Lights: {status['light_count']}, "
+                  f"Darks: {status['dark_count']}, "
+                  f"Flats: {status['flat_count']}, "
+                  f"Bias: {status['bias_count']}")
+            if status["needs_bias"]:
+                print("  Note: Bias required (dark exposure != light exposure)")
 
-        # Check for calibration frames
-        has_darks, has_flats, dark_count, flat_count = has_calibration_frames(
-            metadata, calibration_dirs, debug
-        )
+        if not status["is_complete"]:
+            reason = status["reason"]
+            print(f"  SKIP: {reason}")
 
-        if not has_darks:
-            print(f"  SKIP: No matching darks found")
-            results["skipped_no_darks"] += 1
+            # Track specific skip reason
+            if "dark" in reason.lower():
+                results["skipped_no_darks"] += 1
+            elif "flat" in reason.lower():
+                results["skipped_no_flats"] += 1
+            elif "bias" in reason.lower():
+                results["skipped_no_bias"] += 1
             continue
 
-        if not has_flats:
-            print(f"  SKIP: No matching flats found")
-            results["skipped_no_flats"] += 1
-            continue
-
-        print(f"  Found {dark_count} darks and {flat_count} flats")
+        print(f"  Calibration complete: {status['dark_count']} darks, "
+              f"{status['flat_count']} flats"
+              + (f", {status['bias_count']} bias" if status["needs_bias"] else ""))
 
         # Move the directory
         dest_full = dest_path / relative_path
-        success = move_directory(light_dir, str(dest_full), debug, dry_run)
+        success = move_directory(image_dir, str(dest_full), debug, dry_run)
 
         if success:
             results["moved"] += 1
@@ -209,7 +216,9 @@ def process_light_directories(
 def main():
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
-        description="Move light frames to data directory when calibration frames exist"
+        description="Move light frames to data directory when calibration frames exist. "
+                    "Calibration frames (darks, flats, bias) must be in the same directory "
+                    "as the light frames."
     )
 
     parser.add_argument(
@@ -220,14 +229,6 @@ def main():
     parser.add_argument(
         "dest_dir",
         help=f"Destination directory for lights (default name: {config.DEFAULT_DATA_DIR})",
-    )
-
-    parser.add_argument(
-        "--calibration-dir",
-        "-c",
-        action="append",
-        dest="calibration_dirs",
-        help="Directory to search for calibration frames (can specify multiple)",
     )
 
     parser.add_argument(
@@ -246,17 +247,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Use source directory as calibration search if not specified
-    calibration_dirs = args.calibration_dirs
-    if not calibration_dirs:
-        # Default: search in common calibration locations relative to source
-        source_parent = Path(ap_common.replace_env_vars(args.source_dir)).parent
-        calibration_dirs = [str(source_parent)]
-        print(f"No calibration directories specified, searching in: {source_parent}")
-
     print(f"Source directory: {args.source_dir}")
     print(f"Destination directory: {args.dest_dir}")
-    print(f"Calibration directories: {calibration_dirs}")
+    print("Calibration frames must be co-located with lights")
 
     if args.dry_run:
         print("\n*** DRY RUN - No files will be moved ***\n")
@@ -264,7 +257,6 @@ def main():
     results = process_light_directories(
         args.source_dir,
         args.dest_dir,
-        calibration_dirs,
         args.debug,
         args.dry_run,
     )
@@ -273,9 +265,10 @@ def main():
     print("\n" + "=" * 50)
     print("Summary:")
     print(f"  Moved:              {results['moved']}")
+    print(f"  Skipped (no lights):{results['skipped_no_lights']}")
     print(f"  Skipped (no darks): {results['skipped_no_darks']}")
     print(f"  Skipped (no flats): {results['skipped_no_flats']}")
-    print(f"  Skipped (no meta):  {results['skipped_no_metadata']}")
+    print(f"  Skipped (no bias):  {results['skipped_no_bias']}")
     print(f"  Errors:             {results['errors']}")
     print("=" * 50)
 

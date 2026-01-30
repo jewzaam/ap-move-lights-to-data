@@ -3,11 +3,13 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
-Move light frames from blink directory to data directory when calibration frames (darks and flats) are available.
+Move light frames from blink directory to data directory when calibration frames (darks, flats, and bias if needed) are available in the same directory.
 
 ## Overview
 
-This tool automates the workflow step between blinking/reviewing light frames and processing them. It only moves light frames to the data directory when matching calibration frames exist, ensuring you don't start processing data that can't be properly calibrated.
+This tool automates the workflow step between blinking/reviewing light frames and processing them. It only moves light frames to the data directory when matching calibration frames exist **in the same directory**, ensuring you don't start processing data that can't be properly calibrated.
+
+**Key requirement**: Calibration frames (darks, flats, bias) must be co-located with the light frames in the same directory structure.
 
 ## Installation
 
@@ -36,30 +38,27 @@ python -m ap_move_lights_to_data <source_dir> <dest_dir> [options]
 
 ### Options
 
-- `-c, --calibration-dir`: Directory to search for calibration frames (can specify multiple)
 - `-d, --debug`: Enable debug output
 - `-n, --dry-run`: Show what would be done without actually moving files
 
 ### Example
 
 ```bash
-# Move lights from 10_Blink to 20_Data, searching for calibration in parent directory
+# Move lights from 10_Blink to 20_Data
 python -m ap_move_lights_to_data \
     "/astrophotography/RedCat51@f4.9+ASI2600MM/10_Blink" \
-    "/astrophotography/RedCat51@f4.9+ASI2600MM/20_Data" \
-    -c "/astrophotography/calibration"
+    "/astrophotography/RedCat51@f4.9+ASI2600MM/20_Data"
 
 # Dry run to see what would be moved
 python -m ap_move_lights_to_data \
     "10_Blink" \
     "20_Data" \
-    -c "../calibration" \
     --dry-run
 ```
 
-## Calibration Matching
+## Calibration Requirements
 
-Lights are only moved when **both** darks and flats are found matching these criteria:
+Lights are only moved when calibration frames are found **in the same directory** matching these criteria:
 
 ### Dark Matching
 - Camera
@@ -76,26 +75,43 @@ Lights are only moved when **both** darks and flats are found matching these cri
 - Readout mode
 - Filter
 
+### Bias Requirement
+
+Bias frames are **only required** when the dark exposure time does not match the light exposure time. This is because darks with mismatched exposure times need bias subtraction for proper scaling.
+
+If dark exposure matches light exposure: **No bias required**
+If dark exposure differs from light exposure: **Bias required**
+
 ## Directory Structure
 
-The tool preserves the directory structure when moving:
+The tool expects calibration frames to be in the same directory as lights:
 
 ```
 10_Blink/
   M31/
-    DATE_2024-01-15/
-      FILTER_Ha_EXP_300/
-        light_001.fits
+    accept/
+      DATE_2024-01-15/
+        light_001.fits      # Light frames
         light_002.fits
+        dark_001.fits       # Dark frames (same dir)
+        dark_002.fits
+        flat_Ha_001.fits    # Flat frames (same dir)
+        flat_Ha_002.fits
+        bias_001.fits       # Bias (only if dark exp != light exp)
 
-# Becomes (if calibration exists):
+# Becomes (if calibration complete):
 
 20_Data/
   M31/
-    DATE_2024-01-15/
-      FILTER_Ha_EXP_300/
+    accept/
+      DATE_2024-01-15/
         light_001.fits
         light_002.fits
+        dark_001.fits
+        dark_002.fits
+        flat_Ha_001.fits
+        flat_Ha_002.fits
+        bias_001.fits
 ```
 
 ## Dependencies
