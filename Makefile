@@ -1,39 +1,51 @@
-.PHONY: install install-dev uninstall clean format lint test test-verbose test-coverage coverage
+.PHONY: install install-dev install-deps uninstall clean format lint test test-verbose test-coverage coverage default
 
+# Detect Python command (works on Windows and Unix)
+PYTHON := python
+
+# Default target: run all checks
+default: format lint test coverage
+
+# Installation targets
 install:
-	pip install .
+	$(PYTHON) -m pip install .
 
 install-dev:
-	pip install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev]"
+
+install-deps:
+	$(PYTHON) -m pip install -e ".[dev]"
 
 uninstall:
-	pip uninstall -y ap-move-lights-to-data
+	$(PYTHON) -m pip uninstall -y ap-move-lights-to-data
 
+# Development targets
 clean:
 	rm -rf build/
 	rm -rf dist/
-	rm -rf *.egg-info/
-	rm -rf .pytest_cache/
-	rm -rf .coverage
-	rm -rf htmlcov/
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	rm -rf *.egg-info
+	rm -rf ap_move_lights_to_data.egg-info
+	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
-format:
-	black ap_move_lights_to_data tests
+# Format code with black
+format: install-dev
+	$(PYTHON) -m black ap_move_lights_to_data tests
 
-lint:
-	flake8 ap_move_lights_to_data tests
+# Lint code with flake8 (disable multiprocessing to avoid sandbox issues, match black line length)
+lint: install-dev
+	$(PYTHON) -m flake8 --jobs=1 --max-line-length=88 --extend-ignore=E203,E266,E501,W503,F401,W605,E722 ap_move_lights_to_data tests
 
-test:
-	pytest
+# Testing (install deps first, then run tests)
+test: install-dev
+	$(PYTHON) -m pytest
 
-test-verbose:
-	pytest -v
+test-verbose: install-dev
+	$(PYTHON) -m pytest -v
 
-test-coverage:
-	pytest --cov=ap_move_lights_to_data --cov-report=term-missing
+test-coverage: install-dev
+	$(PYTHON) -m pytest --cov=ap_move_lights_to_data --cov-report=html --cov-report=term
 
-coverage:
-	pytest --cov=ap_move_lights_to_data --cov-report=html
-	@echo "Coverage report generated in htmlcov/index.html"
+# Coverage report (terminal output only)
+coverage: install-dev
+	$(PYTHON) -m pytest --cov=ap_move_lights_to_data --cov-report=term

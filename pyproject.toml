@@ -7,7 +7,7 @@ name = "ap-move-lights-to-data"
 version = "0.1.0"
 description = "Move light frames from blink to data directory when calibration frames are available"
 readme = "README.md"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10,<3.15"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -16,12 +16,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
     "ap-common @ git+https://github.com/jewzaam/ap-common.git",
 ]
+
+[project.scripts]
+ap-move-lights-to-data = "ap_move_lights_to_data.move_lights_to_data:main"
 
 [project.optional-dependencies]
 dev = [
