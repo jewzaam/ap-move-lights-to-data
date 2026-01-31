@@ -132,6 +132,81 @@ def move_directory(
         return False
 
 
+def move_target_files(
+    lights_dir: str,
+    source_dir: str,
+    dest_dir: str,
+    debug: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """
+    Move non-FITS files from target-level directory when lights dir is a leaf.
+
+    If the lights directory has no subdirectories (is a leaf), this moves all
+    non-directory files from the target-level directory (first directory under
+    source_dir) to the corresponding location in dest_dir.
+
+    Args:
+        lights_dir: Directory containing light frames
+        source_dir: Source root directory
+        dest_dir: Destination root directory
+        debug: Enable debug output
+        dry_run: If True, only print what would be done
+
+    Returns:
+        Number of files successfully moved
+    """
+    lights_path = Path(lights_dir)
+    source_path = Path(ap_common.replace_env_vars(source_dir))
+    dest_path = Path(ap_common.replace_env_vars(dest_dir))
+
+    # Check if lights directory is a leaf (has no subdirectories)
+    has_subdirs = any(lights_path.iterdir()) and any(
+        item.is_dir() for item in lights_path.iterdir()
+    )
+    if has_subdirs:
+        logger.debug(
+            f"Lights directory {lights_dir} has subdirectories, skipping target files"
+        )
+        return 0
+
+    # Find target-level directory (first directory under source_dir)
+    try:
+        relative_to_source = lights_path.relative_to(source_path)
+        parts = relative_to_source.parts
+        if not parts:
+            logger.debug("Lights directory is source directory, no target level")
+            return 0
+
+        target_dir = source_path / parts[0]
+    except ValueError:
+        logger.warning(
+            f"Lights directory {lights_dir} is not under source {source_path}"
+        )
+        return 0
+
+    # Find all non-directory files in target directory
+    moved_count = 0
+    try:
+        for item in target_dir.iterdir():
+            if item.is_file():
+                # Calculate destination path
+                dest_target = dest_path / parts[0]
+                dest_file = dest_target / item.name
+
+                # Move the file
+                try:
+                    ap_common.move_file(str(item), str(dest_file), debug, dry_run)
+                    moved_count += 1
+                    logger.debug(f"Moved target file: {item} -> {dest_file}")
+                except Exception as e:
+                    logger.error(f"Failed to move target file {item}: {e}")
+    except Exception as e:
+        logger.error(f"Error iterating target directory {target_dir}: {e}")
+
+    return moved_count
+
+
 def move_calibration_files(
     calibration_files: List[str],
     source_dir: str,
@@ -299,6 +374,13 @@ def process_light_directories(
             )
 
         logger.debug(f"Moved {total_cal_moved} calibration files")
+
+        # Move target-level files if lights dir is a leaf (before moving lights)
+        target_files_moved = move_target_files(
+            image_dir, source_dir, dest_dir, debug, dry_run
+        )
+        if target_files_moved > 0:
+            logger.debug(f"Moved {target_files_moved} target-level files")
 
         # Move the lights directory
         dest_full = dest_path / relative_path
