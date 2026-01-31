@@ -13,16 +13,16 @@ Calibration frames are searched for in the lights directory first, then in paren
 
 ## Installation
 
+### Development
+
 ```bash
-pip install git+https://github.com/jewzaam/ap-move-lights-to-data.git
+make install-dev
 ```
 
-Or for development:
+### From Git
 
 ```bash
-git clone https://github.com/jewzaam/ap-move-lights-to-data.git
-cd ap-move-lights-to-data
-make install-dev
+pip install git+https://github.com/jewzaam/ap-move-lights-to-data.git
 ```
 
 ## Usage
@@ -161,7 +161,3 @@ make format
 # Lint code
 make lint
 ```
-
-## License
-
-Apache License 2.0 - see [LICENSE](LICENSE) for details

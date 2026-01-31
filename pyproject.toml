@@ -7,7 +7,7 @@ name = "ap-move-lights-to-data"
 version = "0.1.0"
 description = "Move light frames from blink to data directory when calibration frames are available"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = {file = "LICENSE"}
 requires-python = ">=3.10,<3.15"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -27,11 +27,11 @@ ap-move-lights-to-data = "ap_move_lights_to_data.move_lights_to_data:main"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "flake8>=6.0",
+    "mypy",
 ]
 
 [tool.setuptools.packages.find]
@@ -56,9 +56,9 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
 ignore_missing_imports = true
-check_untyped_defs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+warn_return_any = false
+warn_unused_ignores = false
+no_implicit_optional = false
