@@ -759,11 +759,11 @@ def main() -> int:
         args.debug,
         args.dryrun,
         args.quiet,
-        args.scale_darks,
+        args.scale_dark,
     )
 
     if not args.quiet:
-        print_summary(results, scale_darks=args.scale_darks)
+        print_summary(results, scale_darks=args.scale_dark)
 
     return EXIT_ERROR if results["errors"] > 0 else EXIT_SUCCESS
 

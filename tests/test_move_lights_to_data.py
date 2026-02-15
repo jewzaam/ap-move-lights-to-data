@@ -8,7 +8,7 @@ import re
 import pytest
 from pathlib import Path
 from ap_move_light_to_data import move_lights_to_data
-from ap_move_light_to_data.move_lights_to_data import EXIT_ERROR
+from ap_move_light_to_data.move_lights_to_data import EXIT_ERROR, EXIT_SUCCESS
 
 
 class TestBuildSearchDirs:
@@ -1788,3 +1788,270 @@ class TestMetadataCaching:
         # Verify it was called with source directory
         call_args = mock_get_metadata.call_args
         assert str(source) in call_args[1]["dirs"]
+
+
+class TestMainCLIArguments:
+    """Tests for CLI argument parsing in main() function.
+
+    Following CLI Testing Standards to verify argparse attribute mapping.
+    Prevents runtime AttributeError from typos like args.scale_darks vs args.scale_dark.
+    """
+
+    def test_scale_dark_flag_mapping(self, tmp_path, mocker):
+        """Test --scale-dark flag is correctly passed to process function.
+
+        Regression test for bug where args.scale_darks was used instead of
+        args.scale_dark, causing AttributeError at runtime.
+        """
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        # Mock the process function to isolate argparse logic
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={
+                "errors": 0,
+                "moved": 10,
+                "dir_count": 1,
+                "target_count": 1,
+                "date_count": 1,
+                "filter_count": 1,
+                "skipped_no_darks": 0,
+                "skipped_no_flats": 0,
+                "skipped_no_bias": 0,
+                "biases_needed": 0,
+            },
+        )
+
+        # Mock print_summary to simplify test
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        # Mock sys.argv with --scale-dark flag
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest), "--scale-dark"],
+        )
+
+        result = move_lights_to_data.main()
+
+        # Verify exit code
+        assert result == EXIT_SUCCESS
+
+        # CRITICAL: Verify the scale_darks parameter (7th positional arg)
+        # This catches args.scale_darks vs args.scale_dark attribute name mismatch
+        call_args = mock_process.call_args
+        assert call_args.args[6] is True  # scale_darks parameter = True
+
+    def test_scale_dark_disabled(self, tmp_path, mocker):
+        """Test --no-scale-dark flag sets parameter to False."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest), "--no-scale-dark"],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[6] is False  # scale_darks parameter = False
+
+    def test_scale_dark_default(self, tmp_path, mocker):
+        """Test default value when --scale-dark flag omitted."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest)],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[6] is False  # scale_darks default = False
+
+    def test_dryrun_flag(self, tmp_path, mocker):
+        """Test --dryrun flag is correctly passed."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest), "--dryrun"],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[4] is True  # dry_run parameter = True
+
+    def test_quiet_flag(self, tmp_path, mocker):
+        """Test --quiet flag is correctly passed."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mock_summary = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.print_summary"
+        )
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest), "--quiet"],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[5] is True  # quiet parameter = True
+        # print_summary should not be called when quiet=True
+        mock_summary.assert_not_called()
+
+    def test_debug_flag(self, tmp_path, mocker):
+        """Test --debug flag is correctly passed."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest), "--debug"],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[3] is True  # debug parameter = True
+
+    def test_path_pattern_flag(self, tmp_path, mocker):
+        """Test --path-pattern flag passes custom pattern."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        custom_pattern = "LIGHT.*\\.fits"
+        mocker.patch(
+            "sys.argv",
+            [
+                "ap-move-light-to-data",
+                str(source),
+                str(dest),
+                "--path-pattern",
+                custom_pattern,
+            ],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[2] == custom_pattern  # path_pattern parameter
+
+    def test_multiple_flags_combined(self, tmp_path, mocker):
+        """Test --dryrun --quiet --scale-dark work together."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 0},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            [
+                "ap-move-light-to-data",
+                str(source),
+                str(dest),
+                "--dryrun",
+                "--quiet",
+                "--scale-dark",
+            ],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_SUCCESS
+        call_args = mock_process.call_args
+        assert call_args.args[3] is False  # debug = False (default)
+        assert call_args.args[4] is True  # dry_run = True
+        assert call_args.args[5] is True  # quiet = True
+        assert call_args.args[6] is True  # scale_darks = True
+
+    def test_error_exit_code(self, tmp_path, mocker):
+        """Test EXIT_ERROR when process returns errors."""
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        mock_process = mocker.patch(
+            "ap_move_light_to_data.move_lights_to_data.process_light_directories",
+            return_value={"errors": 5, "moved": 10},
+        )
+        mocker.patch("ap_move_light_to_data.move_lights_to_data.print_summary")
+
+        mocker.patch(
+            "sys.argv",
+            ["ap-move-light-to-data", str(source), str(dest)],
+        )
+
+        result = move_lights_to_data.main()
+
+        assert result == EXIT_ERROR
+        mock_process.assert_called_once()
